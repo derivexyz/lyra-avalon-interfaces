@@ -66,7 +66,7 @@ contract BasicOptionMarketWrapper is Ownable {
 
     _returnExcessFunds(c);
 
-    if (c.optionToken.getPositionState(result.positionId) == OptionToken.PositionState.ACTIVE) {
+    if (c.optionToken.getPositionState(result.positionId) == IOptionToken.PositionState.ACTIVE) {
       c.optionToken.transferFrom(address(this), msg.sender, params.positionId);
     }
   }
@@ -88,7 +88,7 @@ contract BasicOptionMarketWrapper is Ownable {
 
     _returnExcessFunds(c);
 
-    if (c.optionToken.getPositionState(result.positionId) == OptionToken.PositionState.ACTIVE) {
+    if (c.optionToken.getPositionState(result.positionId) == IOptionToken.PositionState.ACTIVE) {
       c.optionToken.transferFrom(address(this), msg.sender, params.positionId);
     }
   }

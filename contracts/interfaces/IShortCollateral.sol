@@ -23,7 +23,7 @@ interface IShortCollateral {
   ///////////////
 
 
-  function settleOptions(uint[] memory positionIds) external ;
+  function settleOptions(uint[] memory positionIds) external returns (uint[] memory settlementAmounts);
 
   ////////////
   // Events //

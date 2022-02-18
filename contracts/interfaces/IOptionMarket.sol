@@ -11,11 +11,6 @@ import "./IOptionMarketPricer.sol";
  * for the listing's IV. Also allows for auto cash settling options as at expiry.
  */
 interface IOptionMarket {
-  enum TradeDirection {
-    open,
-    close,
-    liquidation
-  }
 
   enum OptionType {
     LONG_CALL,
