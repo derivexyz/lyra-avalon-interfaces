@@ -1,0 +1,21 @@
+{
+  "name": "lyra-avalon-interfaces",
+  "version": "1.0.0",
+  "main": "",
+  "repository": "https://github.com/lyra-finance/lyra-avalon-interfaces.git",
+  "author": "Lyra",
+  "license": "ISC",
+  "scripts": {
+    "compile": "hardhat compile"
+  },
+  "devDependencies": {
+    "@nomiclabs/hardhat-ethers": "^2.0.5",
+    "@openzeppelin/contracts": "^4.5.0",
+    "@typechain/ethers-v5": "^9.0.0",
+    "@typechain/hardhat": "^4.0.0",
+    "hardhat": "^2.8.4",
+    "ts-node": "^10.5.0",
+    "typechain": "^7.0.0",
+    "typescript": "^4.5.5"
+  }
+}
