@@ -81,7 +81,7 @@ function trackPositions(uint[] positionIds) external onlyOwner {
 }
 ```
 
-*Note, for brevity, we skip over functions that filter out inactive positions or manual removal of positions.*
+*For brevity, we skip over functions that filter out inactive positions or manual removal of positions.*
 
 ## Calculate minimum collateral
 
@@ -129,35 +129,41 @@ Now that we can calculate the target collateral for each position, we can gather
 
 ```solidity
 uint[] flaggedPositionIds;
-uint[] neededCollat;
+mapping(uint => uint) neededCollat;
 uint gatheredCollat;
 
 function gatherAndFlag() 
     external {
     delete flaggedPositionIds; // clear out outdated flags/collateral
-    delete neededCollat;
-    
-    mapping(uint => uint) memory neededCollat = 0;
+
     IOptionToken.PositionAndOwner[positionHead] positionAndOwners = 
         optionToken.getOptionPositions(trackedPositionIds[:positionHead]);
 
+    IOptionMarket.TradeInputParameters tradeParams;
     for (uint i; i < positionHead; i++) {
         uint currentCollat = positionAndOwners[i].collateral;
         uint bufferSpot = _getBufferSpot(positionAndOwner.position);
         uint targetCollat = _getTargetCollateral(positionAndOwners[i], bufferSpot);
             
-        if (currentCollat > targetCollat) {
+        if (currentCollat > targetCollat) { // if there is excess collateral
             gatheredCollat += currentCollat - targetCollat;
-            optionMarket.openPosition(
-                positionAndOwners[i].positionId,
-                1, 
-                positionAndOwners[i].optionType,
-                0, // no additional amount is purchased
-                targetCollat, // returns any excess collateral
-                0, 0);
-        } else {
+
+            tradeParams = IOptionMarket.TradeInputParameters({
+                listingId: positionAndOwners[i].listindId,
+                positionId: positionAndOwners[i].positionId,
+                iterations: 1,
+                optionType: positionAndOwners[i].optionType,
+                amount: 0,
+                setCollateralTo: targetCollat, // returns any excess collateral
+                minTotalCost: 0,
+                maxTotalCost: 0, // cost must be zero since no additional amount open 
+            });
+            optionMarket.openPosition(tradeParams); // execute trade
+
+            positionAndOwners[i].collateral = targetCollat; // update position records
+        } else { // if collateral below target, flag position
+            neededCollat[trackedPositionIds[i]] = targetCollateral - collateral;
             flaggedPositionIds.push(trackedPositionIds[i]);
-            neededCollateral.push(targetCollateral - collateral);
         }
     }
 }
@@ -167,7 +173,7 @@ To gather extra collateral we call openPosition in [IOptionMarket](https://githu
 
 > Notice, by setting the `setCollateralTo` param in `openPosition`, we can gather excess collateral.
 
-*Note, to avoid dealing with ETH/USD conversions, we assume the portfolio only uses quote collateral.*
+*To avoid dealing with ETH/USD conversions, we assume the portfolio only uses quote collateral.*
 
 ## Topoff or close "risky" positions
 
@@ -176,28 +182,37 @@ We can topoff positions the same way we gathered excess collateral. If our manag
 ```solidity
 function topoffOrClose() external {
     IOptionToken.PositionAndOwner currentPosition;
+    IOptionMarket.TradeInputParameters tradeParams;
     for (uint i; i < flaggedPositionIds.length; i++) {
         currentPosition = trackedPositions[flaggedPositionIds[i]];
         if (gatheredCollat >= neededCollat[i]) {
-            optionMarket.openPosition(
-                currentPosition.positionId,
-                1, 
-                currentPosition.optionType,
-                0, // no additional amount is purchased
-                targetCollat, // returns any excess collateral
-                0, 0);
+            tradeParams = IOptionMarket.TradeInputParameters({
+                listingId: currentPosition.listindId,
+                positionId: currentPosition.positionId,
+                iterations: 1,
+                optionType: currentPosition.optionType,
+                amount: 0,
+                setCollateralTo: targetCollat, // returns any excess collateral
+                minTotalCost: 0,
+                maxTotalCost: 0, // cost must be zero since no additional amount open 
+            });
+            optionMarket.openPosition(tradeParams);
+
             gatheredCollat -= gatheredCollat - neededCollat[i];
         } else {
-            optionMarket.closePosition(
-                currentPosition.positionId,
-                1, 
-                currentPosition.optionType,
-                currentPosition.amount, // close out full amount
-                0, // set collateral to 0
-                0, type(uint).max); // assume we are ok with any closing price
+            tradeParams = IOptionMarket.TradeInputParameters({
+                listingId: currentPosition.listindId,
+                positionId: currentPosition.positionId,
+                iterations: 1,
+                optionType: currentPosition.optionType,
+                amount: currentPosition.amount, // close out full amount
+                setCollateralTo: 0,
+                minTotalCost: 0,
+                maxTotalCost: type(uint).max), // assume we are ok with any closing price
+            });
+            optionMarket.closePosition(tradeParams);
         }
     }
-    delete neededCollat;
     delete flaggedPositionIds;
 }
 ```
