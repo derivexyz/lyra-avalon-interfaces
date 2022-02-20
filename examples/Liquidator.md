@@ -13,16 +13,13 @@ In this guide, we setup a simple contract that liquidates multiple underwater po
 
 >Refer to the next guide on how to check minimum collateral and create a collateral manager contract. For more information on the mechanism behind liquidations, refer to [LEAP 18](https://github.com/lyra-finance/LEAPs/blob/main/content/leaps/leap-18.md).
 
-***
 
-### Basics
+## Basics
 Anyone can liquidate a position using the [liquidatePosition](https://github.com/lyra-finance/lyra-avalon-interfaces/blob/master/contracts/interfaces/IOptionMarket.sol) function in the [IOptionMarket](https://github.com/lyra-finance/lyra-avalon-interfaces/blob/master/contracts/interfaces/IOptionMarket.sol) contract, as long as the position is active and underwater. The only two required inputs are `positionId` and `rewardBeneficiary`. The liquidator requires no funds to execute a liquidation other than ETH to pay for gas fees.
 
 >Refer to the [Liquidation Bot](tbd...sorry) guide to learn how to track all active positionIds off-chain using events. In this guide we will assume you already have a list of underwater positions.
 
-***
-
-### Setup the contract
+## Setup the contract
 As an example, let's setup a simple contract that connects to the ETH/USD options market through the [IOptionMarket](https://github.com/lyra-finance/lyra-avalon-interfaces/blob/master/contracts/interfaces/IOptionMarket.sol) interface. Refer to the [Deployment Addresses](tbd...sorry) section for other markets. 
 
 ```solidity
@@ -42,8 +39,7 @@ contract LiquidatorExample {
 
 [IOptionMarket](https://github.com/lyra-finance/lyra-avalon-interfaces/blob/master/contracts/interfaces/IOptionMarket.sol) will deposit your liquidation fees to the `rewardBeneficiary` address.
 
-***
-### Liquidating multiple positions
+## Liquidating multiple positions
 
 Now include a simple wrapper function that liquidates multiple positions which you have identified off-chain:
 ```solidity
@@ -55,15 +51,13 @@ function liquidateMultiplePositions(uint[] positionIds) external {
 ```
 Upon successful liquidation, each position will pay out the liquidation fee in the collateral currency. So liquidation of an sETH collateralized short call will send sETH to `rewardBeneficiary`, while liquidation of an sUSD collateralized short call will denominate the fee in sUSD.
 
-***
-### Revert scenarios
+## Revert scenarios
 | Error                        | Description                          |
 | ---------------------------- | ------------------------------------ |
 | "minimum collateral not met" | position.collateral > minCollateral  |
 | "position not liquidatable"  | not a short position or is inactive  |
 
-***
-### Liquidation profitability calculation
+## Liquidation profitability calculation
 
 When a position is liquidated, a penalized premium is charged to the liquidated user and remaining collateral is split between the user, liquidator, LPs and security module. These parameters are set in the `partialCollatParams` struct in the [OptionToken](https://github.com/lyra-finance/lyra-avalon-interfaces/blob/master/contracts/interfaces/IOptionToken.sol) contract. 
 
@@ -97,7 +91,6 @@ For simplicity, the above example does not account for ETH collateralized shorts
 
 > To ensure profitable liquidations of small positions, Lyra enforces a minimum USD denominated `minLiquidationFee` that is > gas fee.
 
-***
-### Under-collateralized positions
+## Under-collateralized positions
 
 In extreme conditions (e.g. Optimism goes down for an extended time), positions could become under-collateralized and remainingCollateral == 0. To ensure that even these can be liquidated profitably, the liquidationFee is deducted from the penalizedPremium and paid to the liquidator.
