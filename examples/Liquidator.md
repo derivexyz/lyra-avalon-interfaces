@@ -6,16 +6,16 @@ In this guide, we setup a simple contract that liquidates multiple underwater po
 - [x] Basics
 - [x] Setup
 - [x] Liquidating multiple positions
-- [x] Revert scanarios
+- [x] Revert scenarios
 - [x] Liquidation profitability calculation
 - [x] Under-collateralized positions
 
 
->Refer to the next guide on how to check minimum collateral and create a collateral manager contract. For more information on the mechanism behind liquidations, refer to [LEAP 18](https://github.com/lyra-finance/LEAPs/blob/main/content/leaps/leap-18.md).
+>Refer to the [CollateralManager example](https://github.com/lyra-finance/lyra-avalon-interfaces/blob/master/examples/CollateralManager.md) on how to check minimum collateral and create a collateral manager contract. For more information on the mechanism behind liquidations, refer to [LEAP 18](https://github.com/lyra-finance/LEAPs/blob/main/content/leaps/leap-18.md).
 
 
 ## Basics
-Anyone can liquidate a position using the [liquidatePosition](https://github.com/lyra-finance/lyra-avalon-interfaces/blob/master/contracts/interfaces/IOptionMarket.sol) function in the [IOptionMarket](https://github.com/lyra-finance/lyra-avalon-interfaces/blob/master/contracts/interfaces/IOptionMarket.sol) contract, as long as the position is active and underwater. The only two required inputs are `positionId` and `rewardBeneficiary`. The liquidator requires no funds to execute a liquidation other than ETH to pay for gas fees.
+Anyone can liquidate a position using the `liquidatePosition` function in the [IOptionMarket](https://github.com/lyra-finance/lyra-avalon-interfaces/blob/master/contracts/interfaces/IOptionMarket.sol) contract, as long as the position is active and underwater. The only two required inputs are `positionId` and `rewardBeneficiary`. The liquidator requires no funds to execute a liquidation other than ETH to pay for gas fees.
 
 >Refer to the [Liquidation Bot](tbd...sorry) guide to learn how to track all active positionIds off-chain using events. In this guide we will assume you already have a list of underwater positions.
 
@@ -66,7 +66,7 @@ Here is a mock calculation of the liquidation fee for a quote collateralized sho
 ```solidity
 IOptionToken.OptionPosition position = IOptionToken.OptionPosition({ 
     positionId: 123, 
-    listingId:2
+    listingId: 2
     optionType: IOptionToken.OptionType.SHORT_CALL_QUOTE, 
     amount:1
     collateral: 1000, 
