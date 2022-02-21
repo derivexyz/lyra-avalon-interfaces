@@ -32,10 +32,15 @@ interface IOptionToken is IERC721Enumerable {
   ///////////////
   // In-memory //
   ///////////////
-  struct PositionAndOwner {
-    OptionPosition position;
-    address owner;
-  }
+  struct PositionWithOwner {
+     uint positionId;
+     uint listingId;
+     OptionMarket.OptionType optionType;
+     uint amount;
+     uint collateral;
+     PositionState state;
+     address owner;
+   }
 
   // to prevent stack too deep...
   struct LiquidationFees {
@@ -79,11 +84,11 @@ interface IOptionToken is IERC721Enumerable {
   // Note: can possibly run out of gas, don't use in contracts
   function getOwnerPositions(address owner) external view returns (OptionPosition[] memory);
 
-  function getOptionPositions(uint[] memory positionIds) external view returns (PositionAndOwner[] memory);
+  function getOptionPositions(uint[] memory positionIds) external view returns (PositionWithOwner[] memory);
 
-  function getActiveOptionPositions(uint[] memory positionIds) external view returns (PositionAndOwner[] memory);
+  function getActiveOptionPositions(uint[] memory positionIds) external view returns (PositionWithOwner[] memory);
 
-  function getPositionAndOwner(uint positionId) external view returns (PositionAndOwner memory);
+  function getPositionWithOwner(uint positionId) external view returns (PositionWithOwner memory);
 
   function getPositionState(uint positionId) external view returns (PositionState);
 

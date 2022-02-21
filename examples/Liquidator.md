@@ -52,10 +52,9 @@ function liquidateMultiplePositions(uint[] positionIds) external {
 Upon successful liquidation, each position will pay out the liquidation fee in the collateral currency. So liquidation of an sETH collateralized short call will send sETH to `rewardBeneficiary`, while liquidation of an sUSD collateralized short call will denominate the fee in sUSD.
 
 ## Revert scenarios
-| Error                        | Description                          |
+| error message                        | description                          |
 | ---------------------------- | ------------------------------------ |
-| "minimum collateral not met" | position.collateral > minCollateral  |
-| "position not liquidatable"  | not a short position or is inactive  |
+| "position not liquidatable"  | not a short position, is inactive, or collateral > minCollateral  |
 
 ## Liquidation profitability calculation
 

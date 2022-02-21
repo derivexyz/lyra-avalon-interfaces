@@ -63,19 +63,19 @@ After transfering ownership, we must let the manager know which positions to tra
 
 ```solidity
 uint[10] public trackedPositionIds; // setting hard 10x position limit
-mapping(uint => IOptionToken.PositionAndOwner) public trackedPositions;
+mapping(uint => IOptionToken.PositionWithOwner) public trackedPositions;
 uint public positionHead = 0;
 
 function trackPositions(uint[] positionIds) external onlyOwner {
     require(positionHead + positionIds.length <= trackedPositions.length, 
         "exceeded max # of tracked positions");
         
-    IOptionToken.PositionAndOwner[positionIds.length] positionAndOwners = 
+    IOptionToken.PositionWithOwner[positionIds.length] PositionWithOwners = 
         optionToken.getOptionPositions(positionIds);
         
     for (uint i = 0; i < positionIds.length; i++) {
         trackedPositionIds[positionHead] = positionIds[i];
-        trackedPositions[positionIds[i]] = positionAndOwners[i];
+        trackedPositions[positionIds[i]] = PositionWithOwners[i];
         positionHead++;
     }
 }
@@ -107,17 +107,17 @@ Next, we can create our `_getTargetCollateral` function. Notice, if we were to i
 
 ```solidity
 function _getTargetCollateral(
-    IOptionToken.PositionAndOwner positionAndOwner, 
+    IOptionToken.PositionWithOwner PositionWithOwner, 
     uint bufferSpot)
     internal returns (uint targetCollateral) { // assumes only quote collateral
     (uint strike, uint expiry) = 
-        optionMarket.getListingStrikeExpiry(positionAndOwner.listingId);
+        optionMarket.getListingStrikeExpiry(PositionWithOwner.listingId);
     uint targetCollateral = optionGreekCache.getMinCollateral(
-        positionAndOwner.optionType, 
+        PositionWithOwner.optionType, 
         strike, 
         expiry, 
         bufferSpot, 
-        positionAndOwner.amount;
+        PositionWithOwner.amount;
 }
 ```
 
@@ -136,23 +136,21 @@ function gatherAndFlag()
     external {
     delete flaggedPositionIds; // clear out outdated flags/collateral
 
-    IOptionToken.PositionAndOwner[positionHead] positionAndOwners = 
-        optionToken.getOptionPositions(trackedPositionIds[:positionHead]);
-
     IOptionMarket.TradeInputParameters tradeParams;
     for (uint i; i < positionHead; i++) {
-        uint currentCollat = positionAndOwners[i].collateral;
-        uint bufferSpot = _getBufferSpot(positionAndOwner.position);
-        uint targetCollat = _getTargetCollateral(positionAndOwners[i], bufferSpot);
+        IOptionToken.PositionWithOwner currentPosition = trackedPositions[trackedPositionIds[i]];
+        uint currentCollat = currentPosition.collateral;
+        uint bufferSpot = _getBufferSpot(PositionWithOwner.position);
+        uint targetCollat = _getTargetCollateral(PositionWithOwners[i], bufferSpot);
             
         if (currentCollat > targetCollat) { // if there is excess collateral
             gatheredCollat += currentCollat - targetCollat;
 
             tradeParams = IOptionMarket.TradeInputParameters({
-                listingId: positionAndOwners[i].listindId,
-                positionId: positionAndOwners[i].positionId,
+                listingId: currentPosition.listindId,
+                positionId: currentPosition.positionId,
                 iterations: 1,
-                optionType: positionAndOwners[i].optionType,
+                optionType: currentPosition.optionType,
                 amount: 0,
                 setCollateralTo: targetCollat, // returns any excess collateral
                 minTotalCost: 0,
@@ -160,7 +158,7 @@ function gatherAndFlag()
             });
             optionMarket.openPosition(tradeParams); // execute trade
 
-            positionAndOwners[i].collateral = targetCollat; // update position records
+            currentPosition.collateral = targetCollat; // update position records
         } else { // if collateral below target, flag position
             neededCollat[trackedPositionIds[i]] = targetCollateral - collateral;
             flaggedPositionIds.push(trackedPositionIds[i]);
@@ -181,7 +179,7 @@ We can topoff positions the same way we gathered excess collateral. If our manag
 
 ```solidity
 function topoffOrClose() external {
-    IOptionToken.PositionAndOwner currentPosition;
+    IOptionToken.PositionWithOwner currentPosition;
     IOptionMarket.TradeInputParameters tradeParams;
     for (uint i; i < flaggedPositionIds.length; i++) {
         currentPosition = trackedPositions[flaggedPositionIds[i]];
