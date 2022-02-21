@@ -112,7 +112,7 @@ Using the `positionId` we can retreive all details for the position we just open
 IOptionToken.PositionWithOwner position = optionToken.getPositionWithOwner(positionId);
 ```
 
->Use the `getOptionPositions(uint[] positionIds)` to get multiple positions in one call.
+>Use the `getOptionPositions(uint[] positionIds)` function to get multiple positions in one call.
 
 ```solidity
 struct PositionWithOwner {
@@ -151,12 +151,11 @@ IOptionMarket.TradeInputParameters tradeParams = IOptionMarket.TradeInputParamet
 IOptionMarket.Result result = optionMarket.closePosition(tradeParams);
 ```
 
-If we were to set `TradeInputParams.amount` = `position.amount`, the position would be fully closed and `position.state` would be set to `CLOSED`. 
-
+If we were to set `TradeInputParams.amount` = `position.amount`, the position would be fully closed and `position.state` would be set to `CLOSED`. This will send back all the position collateral for shorts regardless of the `setCollateralTo` input.
 
 ## Settle expired position
 
-Once `block.timestamp` > the listing `expiry`, a keeper bot will call `OptionMarket.settleBoard` and allow for individual traders to settle their positions. 
+Once `block.timestamp` > the listing `expiry`, a keeper will call `OptionMarket.settleBoard` and allow for individual traders to settle their positions. 
 
 Let's say we had opened two more options: (1) 1x LONG_CALL and (2) 1x SHORT_PUT_QUOTE with the `positionIds` (1) #2 and (2) #3. We can make the below call to send the option payouts to the `position.owner` address.
 
@@ -166,7 +165,7 @@ uint[] settleAmounts = shortCollateral.settleOptions([1, 2, 3]); // closing all 
 
 `settleAmounts` is returned, which specifies the total `base` or `quote` amounts sent to the `position.owner`.
 
-> You do not have to be the owner of a position to settle it.
+> Note: You do not have to be the owner of a position to settle it. Any contract integrating with lyra should be able to handle settlement as having funds sent directly into the contract by someone else.
 
 ## Settle scenarios:
 
@@ -209,8 +208,8 @@ uint[] settleAmounts = shortCollateral.settleOptions([1, 2, 3]); // closing all 
 
 In Avalon, traders can close options with very low and high deltas, as well as options that are very close to expiry.
 
-The order flow/logic of `IOptionMarket.forceClose` and `IOptionMarket.liquidate` have two distinc features that differentiate them from `closePosition`.
+The order flow/logic of `IOptionMarket.forceClose` and `IOptionMarket.liquidate` have two distinct features that differentiate them from `closePosition`.
 * GWAV `skew`/`vol` are used to compute the black-scholes iv
-* The AMM only slips the `skew` (not `baseIv`)
+* The AMM only applies slippage to the `skew` (and not `baseIv`)
 
 *Refer to the Universal Closing section in [LEAP 18](https://leaps.lyra.finance/leaps/leap-18) for the mechanism relating to force close.*
