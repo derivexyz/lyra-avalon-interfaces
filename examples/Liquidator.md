@@ -4,7 +4,7 @@ Partial collateralization of short options allows traders to earn premiums with 
 
 In this guide, we setup a simple contract that liquidates multiple underwater positions:
 - [x] Basics
-- [x] Setup
+- [x] Setup contract
 - [x] Liquidating multiple positions
 - [x] Revert scenarios
 - [x] Liquidation profitability calculation
@@ -19,7 +19,7 @@ Anyone can liquidate a position using the `liquidatePosition` function in the [I
 
 >Refer to the [Liquidation Bot](tbd...sorry) guide to learn how to track all active positionIds off-chain using events. In this guide we will assume you already have a list of underwater positions.
 
-## Setup the contract
+## Setup contract
 As an example, let's setup a simple contract that connects to the ETH/USD options market through the [IOptionMarket](https://github.com/lyra-finance/lyra-avalon-interfaces/blob/master/contracts/interfaces/IOptionMarket.sol) interface. Refer to the [Deployment Addresses](tbd...sorry) section for other markets. 
 
 ```solidity
@@ -54,7 +54,8 @@ Upon successful liquidation, each position will pay out the liquidation fee in t
 ## Revert scenarios
 | error message                        | description                          |
 | ---------------------------- | ------------------------------------ |
-| "position not liquidatable"  | not a short position, is inactive, or collateral > minCollateral  |
+| position not liquidatable  | not a short position, is inactive, or collateral > minCollateral  |
+| new skew outside absolute min/max range | cannot liqudate positions that will slip skew beyond `IOptionMarketPricer.tradeLimParams` absMinSkew and absMaxSkew.
 
 ## Liquidation profitability calculation
 
