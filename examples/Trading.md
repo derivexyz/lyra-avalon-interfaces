@@ -1,20 +1,18 @@
 # Trader Example
 
 In this guide, we will interact directly with the core contracts to do the following:
-- [x] Setup a simple managed trader contract which
-- [x] Opens trades determined by the `Owner`
-- [x] Can get `optionPosition` details
-- [x] Adjusts position `amount` and `collateral`
-- [x] Settles the expired position
-- [x] Common revert scenarios
-- [x] Note on `forceClose`
-- [x] Note on settling expired positions
+1. [Setup a simple trader contract](#setup)
+2. [Open trades determined by the `Owner`](#open)
+3. [Adjusts existing positions](#existing)
+4. [Force close](#force)
+4. [Position settling](#settle)
+5. [Common revert scenarios](#reverts)
 
 We use the terminology - `base` to denote the option asset and `quote` to represent the unit of pricing. For the ETH market `quote` is sUSD and `base` is sETH.
 
 *Note: To learn how to interact with Lyra via the VaultAdapter, refer to: [lyra-vaults](https://github.com/lyra-finance/lyra-vaults) or the [CollateralManager](...) example*
 
-## Setup contract
+## Setup simple trader contract <a name="setup"></a>
 
 To perform actions in this guide, we will need to import [OptionMarket.sol](https://github.com/lyra-finance/lyra-protocol/blob/master/contracts/OptionMarket.sol), [OptionToken.sol](https://github.com/lyra-finance/lyra-protocol/blob/master/contracts/OptionToken.sol) and [ShortCollateral.sol](https://github.com/lyra-finance/lyra-protocol/blob/master/contracts/ShortCollateral.sol). 
 
@@ -46,7 +44,7 @@ contract TraderExample is Ownable {
 ```
 Call `getMarketDeploys` via [@lyrafinance/protocol](https://www.npmjs.com/package/@lyrafinance/protocol) to get addresses of different `base`/`quote` option markets. 
 
-## Open a new position
+## Open a new position <a name="open"></a>
 
 Lyra options are organized by `OptionMarket`, `boardId`, `strikeId` and `positionId`:
 * `OptionMarket` - contract/address that manages options for an underlying `base`/`quote` pair (e.g. ETH/USD)
@@ -94,7 +92,7 @@ function openNewPosition(uint strikeId, OptionMarket.OptionType optionType, uint
 *Note: For the sake of simplicity, we have removed units from these function calls. In reality, these values would be multiplied by the unit of the tokens (1e18).*
 
 
-## Get existing position details
+## Get existing position details <a name="getter"></a>
 
 We can retreive all details of our position we just opened using the `positionId`.
 
@@ -116,7 +114,7 @@ struct PositionWithOwner {
 }
 ```
 
-## Adjust existing position amount and collateral
+## Adjust existing position amount and collateral  <a name="existing"></a>
 
 Now, let's do a more complex trade
 * close only 50% of the current `position.amount`
@@ -149,7 +147,7 @@ function reducePositionAndAddCollateral(uint positionId, uint reduceAmount, uint
 
 If we were to set `TradeInputParams.amount` = `position.amount`, the position would be fully closed and `position.state` would be set to `CLOSED`. This will send back all the position collateral for shorts regardless of the `setCollateralTo` input.
 
-## Force Closing (a.k.a Universal Closing)
+## Force Closing (a.k.a Universal Closing)  <a name="force"></a>
 
 When reducing the position in the above function, we gave the owner two options. Traders can either call `closePosition` which works for positions within a certain delta range (~8-92) or use `forceClosePosition` to reduce amount on positions with deltas beyond the range or options that are very close to expiry in exchange for a fee.
 
@@ -159,13 +157,11 @@ The order flow/logic of `OptionMarket.forceClose()` and `OptionMarket.liquidate(
 
 *Refer to [`OptionGreekCache.getPriceForForceClose()`](https://github.com/lyra-finance/lyra-protocol/blob/master/contracts/OptionGreekCache.sol) for the exact mechanism*
 
-## Settle expired position
+## Settle expired position  <a name="settle"></a>
 
-Once `block.timestamp` > the listing `expiry`, Lyra keepers auto-settle everyone's expired positions via `ShortCollateral.settleOptions(uint[] positionIds)`.
+Once `block.timestamp` > the listing `expiry`, Lyra keepers auto-settle everyone's expired positions via `ShortCollateral.settleOptions(uint[] positionIds)`.However, anyone can settle positions manually if they wish to.
 
-> Note: Anyone can settle positions manually if they wish to.
-
-## Settle scenarios:
+### Settle scenarios:
 
 * LONG_CALL
   * `if spot > strike: amount * (spot - strike)` reserved per option to pay out to the user (in quote)
@@ -181,7 +177,7 @@ Once `block.timestamp` > the listing `expiry`, Lyra keepers auto-settle everyone
   * `if spot < strike: amount * (strike - spot)` paid to LP from `position.collateral` (in quote)
   * remainder is sent to trader in `quote`
 
-## Common revert scenarios
+## Common revert scenarios  <a name="reverts"></a>
 
 | custom error                                    | contract            | description                         |
 | ----------------------------------------------- | --------------------|------------------------------------ |
@@ -190,7 +186,6 @@ Once `block.timestamp` > the listing `expiry`, Lyra keepers auto-settle everyone
 | BoardIsFrozen                                   | OptionMarket        | admin has frozen board
 | BoardExpired                                    | OptionMarket        | listing `expiry` < `block.timestamp`
 | insufficient funds                              | ERC20               | LP or trader does not have sufficient funds
-| vol too high/vol too low                        | OptionMarketPricer  | trade slipped vol, skew or IV beyond `IOptionMarketPricer.tradeLimitParams` limits
 | TradeDeltaOutOfRange                            | OptionMarketPricer  | opening/closing outside of delta range, use `forceClose` to bypass
 | ForceCloseDeltaOutOfRange                       | OptionMarketPricer  | force closing outside the forceCloseDeltaRange, use `forceClose` to bypass
 | TradingCutoffReached                            | OptionMarketPricer  | opening/closing too close to expiry, use `forceClose` to bypass
