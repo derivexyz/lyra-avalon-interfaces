@@ -1,9 +1,9 @@
 # Trader Example
 
-In this guide, we will interact directly with the core contracts to do the following:
+In this guide, we will build a contract that interacts directly with the core Lyra contracts:
 1. [Setup a simple trader contract](#setup)
-2. [Open trades determined by the `Owner`](#open)
-3. [Adjusts existing positions](#existing)
+2. [Open trades determined by the owner](#open)
+3. [Adjust existing positions](#existing)
 4. [Force close](#force)
 4. [Position settling](#settle)
 5. [Common revert scenarios](#reverts)
@@ -23,26 +23,36 @@ pragma solidity 0.8.9;
 import {OptionMarket} from "@lyrafinance/protocol/contracts/OptionMarket.sol";
 import {OptionToken} from "@lyrafinance/protocol/contracts/OptionToken.sol";
 import {ShortCollateral} from "@lyrafinance/protocol/contracts/ShortCollateral.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract TraderExample is Ownable {
     IOptionMarket public optionMarket;
     IOptionToken public optionToken;
     IShortCollateral public shortCollateral;
+    IERC20 internal quoteAsset;
+    IERC20 internal baseAsset;
 
     uint[] public activePositionIds;
 
     constructor( 
-        IOptionMarket _ethMarketAddress, 
-        IOptionToken _ethOptionToken,
-        IShortCollateral _ethShortCollateral
+      IOptionMarket _ethMarketAddress, 
+      IOptionToken _ethOptionToken,
+      IShortCollateral _ethShortCollateral,
+      IERC20 _quoteAsset,
+      IERC20 _baseAsset
     ) Ownable() {
-        optionMarket = _ethMarketAddress; 
-        optionToken = _ethOptionToken; 
-        shortCollateral = _ethShortCollateral;
+      optionMarket = _ethMarketAddress; 
+      optionToken = _ethOptionToken; 
+      shortCollateral = _ethShortCollateral;
+      quoteAsset = _quoteAsset;
+      baseAsset = _baseAsset;
+
+      quoteAsset.approve(address(this), type(uint).max);
+      baseAsset.approve(address(this), type(uint).max);
     }
 }
 ```
-Call `getMarketDeploys` via [@lyrafinance/protocol](https://www.npmjs.com/package/@lyrafinance/protocol) to get addresses of different `base`/`quote` option markets. 
+Call `getMarketDeploys` via [@lyrafinance/protocol](https://www.npmjs.com/package/@lyrafinance/protocol) to get addresses of different `base`/`quote` option markets.
 
 ## Open a new position <a name="open"></a>
 
