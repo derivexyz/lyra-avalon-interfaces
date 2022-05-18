@@ -11,6 +11,7 @@ In this guide, we will create a contract that interact with the Lyra markets via
 4. [Calculate minimum collateral](#mincollat)
 5. [Gather excess collateral](#excess)
 6. [Top off and close "risky" positions](#topoffAndClose)
+7. [Deciding between closePosition and forceClose](#force)
 
 ## Set Up the Contract <a name="setup"></a>
 
