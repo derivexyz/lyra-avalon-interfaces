@@ -1,21 +1,21 @@
 # Collateral Manager Example
 
-Partially collateralized positions can go underwater as spot price and time to expiry change. In this example, we build an on-chain collateral manager to reduce risk of liquidations of multiple large options positions. If a portfolio contains 1x short call and 1x short put and ETH price goes increases from $3,000 -> $3500 we have an opportunity to rebalance collateral from short put -> short call without require any extra funds.
+Partially collateralized positions can go underwater as spot price and time to expiry change. In this example, we build an on-chain collateral manager to reduce risk of liquidations of multiple large options positions. If a portfolio contains 1x short call and 1x short put and ETH price goes increases from $3,000 -> $3500 we have an opportunity to rebalance collateral from short put -> short call without requiring any extra funds.
 
 ## Example Collateral Manager Contract
 
 In this guide, we will create a contract that interact with the Lyra markets via the VaultAdapter.sol:
 1. [Setup manager contract](#setup)
-2. [Transfer position to manager](#transfer)
+2. [Transfer positions to manager](#transfer)
 3. [Keep track of open short positions](#track)
 4. [Calculate minimum collateral](#mincollat)
 5. [Gather excess collateral](#excess)
 6. [Top off and close "risky" positions](#topoffAndClose)
-7. [Deciding between closePosition and forceClose](#force)
+7. [`closePosition` vs `forceClose`](#force)
 
 ## Set Up the Contract <a name="setup"></a>
 
-In the [Trading](...) example because we directly called the core Lyra contracts, we needed to import/manage several different contracts. To greatly simplify this process, our manager contract can simply inherit the [VaultAdapter]() which contains all the standard Lyra functions in one place.
+In the [Trading](...) example, we imported/interacted directly with several different Lyra contracts. To greatly simplify integration, our manager contract can inherit the [VaultAdapter.sol]() which contains all the standard Lyra functions in one place.
 
 Install the [@lyrafinance/protocol](https://www.npmjs.com/package/@lyrafinance/protocol) package and follow the setup instructions.
 
@@ -63,11 +63,11 @@ contract CollateralManagerExample is VaultAdapter, Ownable {
 }
 ```
 
-Call `getMarketDeploys/getGlobalDeploys` via [@lyrafinance/protocol](https://www.npmjs.com/package/@lyrafinance/protocol) to get deployment addresses.
+Call `getMarketDeploys()/getGlobalDeploys()` via [@lyrafinance/protocol](https://www.npmjs.com/package/@lyrafinance/protocol) to get deployment addresses.
 
 ## Transfer position ownership to manager <a name="transfer"></a>
 
-Assuming you already have open positions, we must first transfer ownership of these positions:
+Assuming you already have open positions, we must first transfer ownership of these positions to the manager:
 
 ```typescript
 import { getMarketDeploys } from '@lyrafinance/protocol';
@@ -81,7 +81,7 @@ await optionToken["transferFrom"](deployer.address, collateralManagerAddress, po
 
 ## Only track short positions  <a name="track"></a>
 
-After transfering ownership, we let the manager know which positions to track. We bulk store tracked positions into the `trackedPositions` mapping using `VaultAdapter._getPositions()`. As we are inheriting `VaultAdapter` we can use the built-in structs.
+After transfering ownership, we record the positions in the manager contract. `VaultAdapter._getPositions()` can be used to get all position details. As we are inheriting `VaultAdapter` we can also use the built-in structs.
 
 ```solidity
 uint[10] public trackedPositionIds; // setting hard 10x position limit
@@ -112,7 +112,7 @@ function trackPositions(uint[] positionIds) external onlyOwner {
 
 ## Calculate minimum collateral <a name="mincollat"></a>
 
-To decide whether we want to topOff/take excess collateral from a position, we will calculate the minCollateral and add a 50% buffer. We can use the built-in `VaultAdapter._getMinCollateralForPosition()` function to get this value. The direct alternative to this is `OptionGreekCache.getMinCollateral()` but requires many more cross-contract calls.
+To decide whether we want to topOff or take excess collateral from a position, we calculate the `minCollateral` using `VaultAdapter._getMinCollateralForPosition()` and add a 50% buffer. The direct alternative to this is `OptionGreekCache.getMinCollateral()` but requires more cross-contract calls.
 
 ```solidity
 function _getTargetCollateral(uint positionId)
@@ -121,7 +121,7 @@ function _getTargetCollateral(uint positionId)
 }
 ```
 
-If we wanted to determine `targetCollateral` as the minCollat if price jumped 50% we could use `VaultAdapter._getMinCollateral()` which takes in manual params such as `spotPrice`, `expiry`.
+If we wanted to determine estimate the `minCollatateral` if price jumped 50% we could use `VaultAdapter._getMinCollateral()` which takes in manual params such as `spotPrice`, `expiry`.
 
 ## Gather excess collateral and flag "risky" positions  <a name="excess"></a>
 
@@ -166,7 +166,7 @@ function gatherAndFlag()
 }
 ```
 
-To change collateral we can use `VaultAdapter._openPosition()`. By setting the `setCollateralTo` param in `openPosition`, we can gather excess collateral.
+To change collateral we can use `VaultAdapter._openPosition()`. Setting the `setCollateralTo` param to `targetCollat` returns any excess collateral to `msg.sender`.
 
 *To avoid dealing with ETH/USD conversions, we assume the portfolio only uses quote collateral.*
 
@@ -193,7 +193,7 @@ function topoffOrClose() external {
 
     if (gatheredCollat >= neededCollat[i]) {
       _openPosition(tradeParams);
-      gatheredCollat -= gatheredCollat - neededCollat[i];
+      gatheredCollat -= neededCollat[i];
     } else { // fully close position if not enough collateral
       tradeParams.setCollateral = 0;
       tradeParams.amount = currentPosition.amount; 
