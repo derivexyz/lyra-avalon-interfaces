@@ -4,7 +4,7 @@ Partially collateralized positions can go underwater as spot price and time to e
 
 ## Example Collateral Manager Contract
 
-In this guide, we will create a contract that interact with the Lyra markets via the VaultAdapter.sol:
+In this guide, we will create a contract that interact with the Lyra markets via the LyraAdapter.sol:
 1. [Setup manager contract](#setup)
 2. [Transfer positions to manager](#transfer)
 3. [Keep track of open short positions](#track)
@@ -15,50 +15,28 @@ In this guide, we will create a contract that interact with the Lyra markets via
 
 ## Set Up the Contract <a name="setup"></a>
 
-In the [Trading](...) example, we imported/interacted directly with several different Lyra contracts. To greatly simplify integration, our manager contract can inherit the [VaultAdapter.sol]() which contains all the standard Lyra functions in one place.
+In the [Trading](https://github.com/lyra-finance/lyra-avalon-interfaces/blob/master/examples/CollateralManager.md) example, we imported/interacted directly with several different Lyra contracts. To greatly simplify integration, our manager contract can inherit the `LyraAdapter.sol]` which contains all the standard Lyra functions in one place.
 
 Install the [@lyrafinance/protocol](https://www.npmjs.com/package/@lyrafinance/protocol) package and follow the setup instructions.
 
 ```solidity
 pragma solidity 0.8.9;
-import {VaultAdapter} from "@lyrafinance/protocol/contracts/periphery/VaultAdapter.sol";
+import {LyraAdapter} from "@lyrafinance/protocol/contracts/periphery/LyraAdapter.sol";
 
 // Libraries
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract CollateralManagerExample is VaultAdapter, Ownable {
-  constructor() VaultAdapter() Ownable();
+contract CollateralManagerExample is LyraAdapter {
+  constructor() LyraAdapter();
     
   function initAdapter(
-    address _curveSwap,
-    address _optionToken,
+    address _lyraRegistry,
     address _optionMarket,
-    address _liquidityPool,
-    address _shortCollateral,
-    address _synthetixAdapter,
-    address _optionPricer,
-    address _greekCache,
-    address _quoteAsset,
-    address _baseAsset,
+    address _curveSwap,
     address _feeCounter
   ) external onlyOwner {
-    setLyraAddresses(
-      _curveSwap,
-      _optionToken,
-      _optionMarket,
-      _liquidityPool,
-      _shortCollateral,
-      _synthetixAdapter,
-      _optionPricer,
-      _greekCache,
-      _quoteAsset,
-      _baseAsset,
-      _feeCounter
-    );
-
-    quoteAsset.approve(address(vault), type(uint).max);
-    baseAsset.approve(address(vault), type(uint).max);
+    // set addresses for LyraAdapter
+    setLyraAddresses(_lyraRegistry, _optionMarket, _curveSwap, _feeCounter);
   }
 }
 ```
@@ -81,7 +59,7 @@ await optionToken["transferFrom"](deployer.address, collateralManagerAddress, po
 
 ## Only track short positions  <a name="track"></a>
 
-After transfering ownership, we record the positions in the manager contract. `VaultAdapter._getPositions()` can be used to get all position details. As we are inheriting `VaultAdapter` we can also use the built-in structs.
+After transfering ownership, we record the positions in the manager contract. `LyraAdapter._getPositions()` can be used to get all position details. As we are inheriting `LyraAdapter` we can also use the built-in structs.
 
 ```solidity
 uint[10] public trackedPositionIds; // setting hard 10x position limit
@@ -112,7 +90,7 @@ function trackPositions(uint[] positionIds) external onlyOwner {
 
 ## Calculate minimum collateral <a name="mincollat"></a>
 
-To decide whether we want to topOff or take excess collateral from a position, we calculate the `minCollateral` using `VaultAdapter._getMinCollateralForPosition()` and add a 50% buffer. The direct alternative to this is `OptionGreekCache.getMinCollateral()` but requires more cross-contract calls.
+To decide whether we want to topOff or take excess collateral from a position, we calculate the `minCollateral` using `LyraAdapter._getMinCollateralForPosition()` and add a 50% buffer. The direct alternative to this is `OptionGreekCache.getMinCollateral()` but requires more cross-contract calls.
 
 ```solidity
 function _getTargetCollateral(uint positionId)
@@ -121,7 +99,7 @@ function _getTargetCollateral(uint positionId)
 }
 ```
 
-If we wanted to determine estimate the `minCollatateral` if price jumped 50% we could use `VaultAdapter._getMinCollateral()` which takes in manual params such as `spotPrice`, `expiry`.
+If we wanted to determine estimate the `minCollatateral` if price jumped 50% we could use `LyraAdapter._getMinCollateral()` which takes in manual params such as `spotPrice`, `expiry`.
 
 ## Gather excess collateral and flag "risky" positions  <a name="excess"></a>
 
@@ -166,7 +144,7 @@ function gatherAndFlag()
 }
 ```
 
-To change collateral we can use `VaultAdapter._openPosition()`. Setting the `setCollateralTo` param to `targetCollat` returns any excess collateral to `msg.sender`.
+To change collateral we can use `LyraAdapter._openPosition()`. Setting the `setCollateralTo` param to `targetCollat` returns any excess collateral to `msg.sender`.
 
 *To avoid dealing with ETH/USD conversions, we assume the portfolio only uses quote collateral.*
 
@@ -212,19 +190,20 @@ function topoffOrClose() external {
 
 ## Decide between closePosition and forceClose <a name="force"></a>
 
-When closing positions in the above function, we had to determine whether we need to use `closePosition` and `forceClose` as sometimes positions may be outside of the delta cutoff range or too close to expiry. We can use several built-in `VaultAdapter` functions to make this decision.
+When closing positions in the above function, we had to determine whether we need to use `closePosition()` and `forceClosePosition()` as sometimes positions may be outside of the delta cutoff range or too close to expiry. We can use the built-in `LyraAdapter.closeOrForceClosePosition()` function to make this decision:
 
 ```solidity
-function _needsForceClose(OptionPosition position) internal {
-  // get position delta, expiry, current time
-  uint callDelta = _getDeltas([position.strikeId])[0]; // we assume we are selling calls for simplicity
-  uint timeToExpiry = (_getStrikes([position.strikeId])[0]).expiry - block.timestamp;
-
-  // compare with market params
-  MarketParams marketParams = _getMarketParams();
-  return (
-    timeToExpiry < marketParams.tradingCutoff 
-    || callDelta < deltaCutOff 
-    || callDelta > (DecimalMath.UNIT - deltaCutOff))
-}
+function _closeOrForceClosePosition(TradeInputParameters memory params)
+  internal
+  returns (TradeResult memory tradeResult) {
+    if (!_isOutsideDeltaCutoff(params.strikeId) && !_isWithinTradingCutoff(params.strikeId)) {
+      return _closePosition(params);
+    } else {
+      // will pay less competitive price to close position but bypasses Lyra delta/trading cutoffs
+      return _forceClosePosition(params);
+    }
 ```
+
+## Trading Rewards <a name="open"></a>
+
+To get trading rewards, refer to [Overview](https://github.com/lyra-finance/lyra-avalon-interfaces/blob/master/examples/Intro.md)

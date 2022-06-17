@@ -1,59 +1,45 @@
 # Trader Example
 
-In this guide, we will build a contract that interacts directly with the core Lyra contracts:
-1. [Setup a simple trader contract](#setup)
+In this guide, we will build a simple contract that purchases call options from the Lyra AMM. 
+
+1. [Import LyraAdapter.sol](#setup)
 2. [Open trades determined by the owner](#open)
 3. [Adjust existing positions](#existing)
 4. [Force close](#force)
 4. [Position settling](#settle)
 5. [Common revert scenarios](#reverts)
+6. [Trading rewards](#rewards)
 
 We use the terminology - `base` to denote the option asset and `quote` to represent the unit of pricing. For the ETH market `quote` is sUSD and `base` is sETH.
 
-*Note: To learn how to interact with Lyra via the VaultAdapter, refer to: [lyra-vaults](https://github.com/lyra-finance/lyra-vaults) or the [CollateralManager](...) example*
+## Import LyraAdapter.sol <a name="setup"></a>
 
-## Setup simple trader contract <a name="setup"></a>
-
-To perform actions in this guide, we will need to import [OptionMarket.sol](https://github.com/lyra-finance/lyra-protocol/blob/master/contracts/OptionMarket.sol), [OptionToken.sol](https://github.com/lyra-finance/lyra-protocol/blob/master/contracts/OptionToken.sol) and [ShortCollateral.sol](https://github.com/lyra-finance/lyra-protocol/blob/master/contracts/ShortCollateral.sol). 
-
-Install the [@lyrafinance/protocol](https://www.npmjs.com/package/@lyrafinance/protocol) package and follow the setup instructions.
+We will use the `LyraAdapter.sol` contract to get all Lyra related functionality in one contract. Install the [@lyrafinance/protocol](https://www.npmjs.com/package/@lyrafinance/protocol) package and follow the setup instructions.
 
 ```solidity
 pragma solidity 0.8.9;
-import {OptionMarket} from "@lyrafinance/protocol/contracts/OptionMarket.sol";
-import {OptionToken} from "@lyrafinance/protocol/contracts/OptionToken.sol";
-import {ShortCollateral} from "@lyrafinance/protocol/contracts/ShortCollateral.sol";
+import {LyraAdapter} from "@lyrafinance/protocol/contracts/periphery/LyraAdapter.sol";
+
+// Libraries
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-contract TraderExample is Ownable {
-    IOptionMarket public optionMarket;
-    IOptionToken public optionToken;
-    IShortCollateral public shortCollateral;
-    IERC20 internal quoteAsset;
-    IERC20 internal baseAsset;
-
-    uint[] public activePositionIds;
-
-    constructor( 
-      IOptionMarket _ethMarketAddress, 
-      IOptionToken _ethOptionToken,
-      IShortCollateral _ethShortCollateral,
-      IERC20 _quoteAsset,
-      IERC20 _baseAsset
-    ) Ownable() {
-      optionMarket = _ethMarketAddress; 
-      optionToken = _ethOptionToken; 
-      shortCollateral = _ethShortCollateral;
-      quoteAsset = _quoteAsset;
-      baseAsset = _baseAsset;
-
-      quoteAsset.approve(address(this), type(uint).max);
-      baseAsset.approve(address(this), type(uint).max);
-    }
+contract TraderExample is LyraAdapter {
+  constructor() LyraAdapter()
+  uint[] public activePositionIds;
+    
+  function initAdapter(
+    address _lyraRegistry,
+    address _optionMarket,
+    address _curveSwap,
+    address _feeCounter
+  ) external onlyOwner {
+    // set addresses for LyraAdapter
+    setLyraAddresses(_lyraRegistry, _optionMarket, _curveSwap, _feeCounter);
+  }
 }
 ```
-Call `getMarketDeploys` via [@lyrafinance/protocol](https://www.npmjs.com/package/@lyrafinance/protocol) to get addresses of different `base`/`quote` option markets.
 
+Call `getMarketDeploys` via [@lyrafinance/protocol](https://www.npmjs.com/package/@lyrafinance/protocol) to get required addresses.
 ## Open a new position <a name="open"></a>
 
 Lyra options are organized by `OptionMarket`, `boardId`, `strikeId` and `positionId`:
@@ -65,7 +51,7 @@ Lyra options are organized by `OptionMarket`, `boardId`, `strikeId` and `positio
 Each position must choose an `optionType` - long/short; call/put; base/quote collateralized, specified by the following enum: 
 
 ```solidity
-enum OptionMarket.OptionType {
+enum LyraAdapter.OptionType {
   LONG_CALL,
   LONG_PUT,
   SHORT_CALL_BASE, // base collateral
@@ -80,12 +66,12 @@ When opening/adjusting a position, we need to consider 4 more params:
 * `minTotalCost/maxTotalCost` - boundaries for the `totalCost` (premium + volatility slippage + fees) at trade execution (otherwise revert)
 * `iterations` - number of sub orders to cut into (only relevant for very large orders). This helps optimize the black-scholes price for very large trades (refer to [appendix C](https://www.lyra.finance/files/whitepaper.pdf) of the whitepaper for more details). 
 
-Let's create a simple wrapper function which the `Owner` can call to open any position.
+Let's create a simple wrapper function which the `Owner` can call to open any position. `LyraAdapter.sol` contains all the needed data types to complete this order.
 
 ```solidity
 
 function openNewPosition(uint strikeId, OptionMarket.OptionType optionType, uint amount, uint setCollateralTo) external onlyOwner {
-  OptionMarket.TradeInputParameters tradeParams = OptionMarket.TradeInputParameters({
+  TradeInputParameters tradeParams = TradeInputParameters({
     strikeId: strikeId,
     positionId: 0, // if 0, new position is created
     iterations: 3, // more iterations use more gas but incur less slippage
@@ -95,32 +81,35 @@ function openNewPosition(uint strikeId, OptionMarket.OptionType optionType, uint
     minTotalCost: 0,
     maxTotalCost: type(uint).max,
   }
-  OptionMarket.Result result = optionMarket.openPosition(tradeParams);
+  TradeResult result = _openPosition(tradeParams); // built-in LyraAdapter.sol function
   activePositionIds.push(result.positionId);
 }
 ```
 *Note: For the sake of simplicity, we have removed units from these function calls. In reality, these values would be multiplied by the unit of the tokens (1e18).*
 
-
 ## Get existing position details <a name="getter"></a>
 
-We can retreive all details of our position we just opened using the `positionId`.
+Use the built-in `LyraAdapter.sol` position getter and struct.
 
 ```solidity
-OptionToken.PositionWithOwner position = optionToken.getPositionWithOwner(positionId);
+OptionPosition position = _getPositions([1, 2, 3]); // get positions with IDs #1, #2, #3
 ```
 
->Use the `getOptionPositions(uint[] positionIds)` function to get multiple positions in one call.
-
+For reference: 
 ```solidity
-struct PositionWithOwner {
-    uint positionId;
-    uint listingId;
-    OptionMarket.OptionType optionType;
-    uint amount;
-    uint collateral;
-    PositionState state; // EMPTY, ACTIVE, CLOSED, LIQUIDATED, SETTLED, or MERGED
-    address owner;
+struct LyraAdapter.OptionPosition {
+  // OptionToken ERC721 identifier for position
+  uint positionId;
+  // strike identifier
+  uint strikeId;
+  // LONG_CALL | LONG_PUT | SHORT_CALL_BASE | SHORT_CALL_QUOTE | SHORT_PUT_QUOTE
+  OptionType optionType;
+  // number of options contract owned by position
+  uint amount;
+  // collateral held in position (only applies to shorts)
+  uint collateral;
+  // EMPTY | ACTIVE | CLOSED | LIQUIDATED | SETTLED | MERGED
+  PositionState state;
 }
 ```
 
@@ -134,9 +123,9 @@ We use the same `TradeInputParameters` struct but this time we call `closePositi
 
 ```solidity
 function reducePositionAndAddCollateral(uint positionId, uint reduceAmount, uint addCollatAmount, bool isForceClose) external onlyOwner{
-  OptionToken.PositionWithOwner position = optionToken.getPositionWithOwner(positionId);
+  Position position = _getPositions(_singletonArray(positionId)); // must first convert number into a static array
 
-  IOptionMarket.TradeInputParameters tradeParams = IOptionMarket.TradeInputParameters({
+  TradeInputParameters tradeParams = TradeInputParameters({
     strikeId: position.strikeId,
     positionId: position.positionId,
     iterations: 3,
@@ -147,10 +136,11 @@ function reducePositionAndAddCollateral(uint positionId, uint reduceAmount, uint
     maxTotalCost: type(uint).max, // assume we are ok with any premium amount
   }
 
+  // built-in LyraAdapter.sol functions
   if (!isForceClose) {
-    optionMarket.closePosition(tradeParams);
+    _closePosition(tradeParams);
   } else {
-    optionMarket.forceClosePosition(tradeParams);
+    _forceClosePosition(tradeParams);
   }
 }
 ```
@@ -159,13 +149,13 @@ If we were to set `TradeInputParams.amount` = `position.amount`, the position wo
 
 ## Force Closing (a.k.a Universal Closing)  <a name="force"></a>
 
-When reducing the position in the above function, we gave the owner two options. Traders can either call `closePosition` which works for positions within a certain delta range (~8-92) or use `forceClosePosition` to reduce amount on positions with deltas beyond the range or options that are very close to expiry in exchange for a fee.
+When reducing the position in the above function, we gave the owner two options. Traders can either call `_closePosition()` which works for positions within a certain delta range (~8-92) or use `_forceClosePosition()` to reduce amount on positions with deltas beyond the range or options that are very close to expiry in exchange for a fee. `LyraAdapter.sol` provides a `_closeOrForceClosePosition()` alternative which will automatically decide the best option depending on delta/cutoff conditions.
 
 The order flow/logic of `OptionMarket.forceClose()` and `OptionMarket.liquidate()` have two distinct features that differentiate them from `closePosition`.
 * GWAV `skew` * `vol` * penalty (instead of the AMM spot skew * vol) are used to compute the black-scholes price
 * The AMM only applies slippage to the `skew` (and not `baseIv`)
 
-*Refer to [`OptionGreekCache.getPriceForForceClose()`](https://github.com/lyra-finance/lyra-protocol/blob/master/contracts/OptionGreekCache.sol) for the exact mechanism*
+*Refer to [`OptionGreekCache.getPriceForForceClose()`](https://github.com/lyra-finance/lyra-protocol/blob/avalon/contracts/OptionGreekCache.sol) for the exact mechanism*
 
 ## Settle expired position  <a name="settle"></a>
 
@@ -205,3 +195,6 @@ Once `block.timestamp` > the listing `expiry`, Lyra keepers auto-settle everyone
 | CannotAdjustInvalidPosition                     | OptionToken         | `position.state` must be `ACTIVE` or `TradeInputParameters` do no match `positionId`
 | BoardMustBeSettled                              | ShortCollateral     | `OptionMarket.settleBoard` has not been called
 
+## Trading Rewards
+
+Refer to [Overview](https://github.com/lyra-finance/lyra-avalon-interfaces/blob/master/examples/Intro.md)

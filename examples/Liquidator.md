@@ -20,24 +20,30 @@ Anyone can liquidate a position using the `liquidatePosition` function in the [I
 >Refer to the [Liquidation Bot](tbd...sorry) guide to learn how to track all active positionIds off-chain using events. In this guide we will assume you already have a list of underwater positions.
 
 ## Setup contract
-As an example, let's setup a simple contract that connects to the ETH/USD options market through the [IOptionMarket](https://github.com/lyra-finance/lyra-avalon-interfaces/blob/master/contracts/interfaces/IOptionMarket.sol) interface. Refer to the [Deployment Addresses](tbd...sorry) section for other markets. 
+
+As an example, let's setup a simple contract that connects to the ETH/USD options market through the `OptionMarket.sol` from the protocol SDK.
+
+Install the [@lyrafinance/protocol](https://www.npmjs.com/package/@lyrafinance/protocol) package and follow the setup instructions.
+
 
 ```solidity
 pragma solidity 0.8.9;
-import "../interfaces/IOptionMarket.sol";
+import {OptionMarket} from "@lyrafinance/protocol/contracts/OptionMarket.sol";
 
 contract LiquidatorExample {
-    IOptionMarket public optionMarket; // ETH/USD options market address
+    OptionMarket public optionMarket; // ETH/USD options market address
     internal address rewardBeneficiary; // address to deposit liquidation fees
 
-    constructor(IOptionMarket _optionMarket, address rewardBeneficiary) {
+    constructor(OptionMarket _optionMarket, address rewardBeneficiary) {
         optionMarket = _optionMarket;
         rewardBeneficiary = _rewardBeneficiary;
     }
 }    
 ```
 
-[IOptionMarket](https://github.com/lyra-finance/lyra-avalon-interfaces/blob/master/contracts/interfaces/IOptionMarket.sol) will deposit your liquidation fees to the `rewardBeneficiary` address.
+`OptionMarket.sol` will deposit your liquidation fees to the `rewardBeneficiary` address.
+
+Call `getMarketDeploys` via [@lyrafinance/protocol](https://www.npmjs.com/package/@lyrafinance/protocol) to get required addresses.
 
 ## Liquidating multiple positions
 
