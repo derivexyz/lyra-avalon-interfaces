@@ -1,9 +1,9 @@
 ## Overview
 
-There are 3x methods to interact with Lyra markets on-chain:
-1. OptionMarketWrapper.sol - open/close/forceClose via wrapper with automatic trading rewards (optimized for lyra-js SDK)
-2. VaultAdapter.sol - all vault related functions via single inherited contract (for on-chain)
-3. Core contracts (OptionMarket.sol/ShortCollateral.sol) - more complex setup but max control
+There are 3x methods to interact with Lyra markets:
+1. JS SDK - routes orders through OptionMarketWrapper.sol and automatically accrues trading rewards
+2. LyraAdapter.sol - all market related functions via single inherited contract
+3. Core contracts - more complex setup but max control
 
 See example guides to learn how to use each method.
 
