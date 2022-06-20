@@ -15,7 +15,7 @@ In this guide, we will create a contract that interact with the Lyra markets via
 
 ## Set Up the Contract <a name="setup"></a>
 
-In the [Trading](https://github.com/lyra-finance/lyra-avalon-interfaces/blob/master/examples/CollateralManager.md) example, we imported/interacted directly with several different Lyra contracts. To greatly simplify integration, our manager contract can inherit the `LyraAdapter.sol]` which contains all the standard Lyra functions in one place.
+In the [Trading](https://github.com/lyra-finance/lyra-avalon-interfaces/blob/master/examples/Trading.md) example, we imported/interacted directly with several different Lyra contracts. To greatly simplify integration, our manager contract can inherit the `LyraAdapter.sol]` which contains all the standard Lyra functions in one place.
 
 Install the [@lyrafinance/protocol](https://www.npmjs.com/package/@lyrafinance/protocol) package and follow the setup instructions.
 

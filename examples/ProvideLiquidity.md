@@ -8,9 +8,9 @@ Liquidity to buy/sell option on the Lyra market is provided by LPs who commit th
 4. [Getting reason for failed process](#failed)
 5. [Liquidity value](#value)
 
-## Set Up <a name="setup"></a>
+## Setup <a name="setup"></a>
 
-LP related activities can be performed directly with the `LiquidityPool.sol` core contract. As in the "Trading" example, install the [@lyrafinance/protocol](https://www.npmjs.com/package/@lyrafinance/protocol) package and follow the setup instructions.
+LP related activities can be performed directly with the `LiquidityPool.sol` core contract. As in the [Trading example](https://github.com/lyra-finance/lyra-avalon-interfaces/blob/master/examples/Trading.md), install the [@lyrafinance/protocol](https://www.npmjs.com/package/@lyrafinance/protocol) package and follow the setup instructions.
 
 ```solidity
 pragma solidity 0.8.9;
@@ -106,7 +106,6 @@ event WithdrawProcessed or WithdrawPartiallyProcessed (
   uint totalQueuedWithdrawals,
   uint timestamp
 );
-```
 
 // to get remaining token amount that has not been processed
 liquidityPool.QueuedWithdrawal queuedWithdrawal = liquidityPool.queuedWithdrawals(withdrawalQueueId);
